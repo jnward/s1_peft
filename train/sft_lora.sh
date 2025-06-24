@@ -1,7 +1,8 @@
 # Reference Running: bash train/sft_lora.sh
 # LoRA training script for s1 project
 uid="$(date +%Y%m%d_%H%M%S)"
-base_model="Qwen/Qwen2.5-7B-Instruct"
+model_size="7B"  # Default model size, can be overridden via --model_size
+base_model="Qwen/Qwen2.5-${model_size}-Instruct"
 block_size=20000
 lr=5e-4
 min_lr=0
@@ -21,6 +22,11 @@ alpha=16
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --model_size)
+            model_size="$2"
+            base_model="Qwen/Qwen2.5-${model_size}-Instruct"
+            shift 2
+            ;;
         --rank)
             rank="$2"
             # alpha remains fixed at 16 for RSLoRA
@@ -61,7 +67,7 @@ torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     --use_lora=True \
     --rank=${rank} \
     --alpha=${alpha} \
-    --output_dir="ckpts/s1-lora-r${rank}-${uid}" \
+    --output_dir="ckpts/s1-lora-${model_size}-r${rank}-${uid}" \
     --push_to_hub=${push_to_hub} \
     --save_only_model=True \
     --gradient_checkpointing=True

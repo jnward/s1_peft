@@ -12,8 +12,8 @@ import os
 
 def main():
     parser = argparse.ArgumentParser(description="Merge LoRA adapter with base model")
-    parser.add_argument("--base_model", type=str, default="Qwen/Qwen2.5-32B-Instruct",
-                       help="Base model name")
+    parser.add_argument("--base_model", type=str, default=None,
+                       help="Base model name (auto-detected from adapter if not specified)")
     parser.add_argument("--adapter_path", type=str, required=True,
                        help="Path to LoRA adapter checkpoint")
     parser.add_argument("--output_path", type=str, default=None,
@@ -24,9 +24,28 @@ def main():
                        help="HuggingFace Hub repository name")
     args = parser.parse_args()
 
+    # Strip trailing slashes from adapter path
+    args.adapter_path = args.adapter_path.rstrip('/')
+
     # Set output path
     if args.output_path is None:
         args.output_path = args.adapter_path + "-merged"
+    
+    # Auto-detect base model from adapter path if not specified
+    if args.base_model is None:
+        import re
+        # Extract model size from path (format: s1-lora-{size}-r{rank}-{timestamp})
+        match = re.search(r's1-lora-(\d+B)-r\d+', args.adapter_path)
+        if not match:
+            raise ValueError(
+                f"Could not extract model size from adapter path: {args.adapter_path}\n"
+                "Expected format: s1-lora-{{size}}-r{{rank}}-{{timestamp}} (e.g., s1-lora-7B-r16-20241224_123456)\n"
+                "Please specify --base_model explicitly."
+            )
+        
+        model_size = match.group(1)
+        args.base_model = f"Qwen/Qwen2.5-{model_size}-Instruct"
+        print(f"Auto-detected base model from path: {args.base_model}")
     
     print(f"Loading base model: {args.base_model}")
     # Load base model in the same precision as training
@@ -59,7 +78,6 @@ def main():
         tokenizer.push_to_hub(args.hub_repo)
     
     print(f"\nMerge complete! Model saved to: {args.output_path}")
-    print(f"Model size: {os.path.getsize(os.path.join(args.output_path, 'model.safetensors')) / 1e9:.1f} GB")
 
 if __name__ == "__main__":
     main()
