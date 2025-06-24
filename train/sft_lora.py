@@ -20,8 +20,8 @@ class TrainingConfig:
     dagger: bool = field(default=False)
     # LoRA specific parameters
     use_lora: bool = field(default=True)
-    lora_rank: int = field(default=16)
-    lora_alpha: int = field(default=16)  # Fixed alpha = 16 as discussed
+    rank: int = field(default=16)
+    alpha: int = field(default=32)  # Default alpha = 2*default_rank
 
     def __post_init__(self):
         os.environ['WANDB_PROJECT'] = self.wandb_project
@@ -59,8 +59,8 @@ def train():
         
         peft_config = LoraConfig(
             task_type=TaskType.CAUSAL_LM,
-            r=config.lora_rank,
-            lora_alpha=config.lora_alpha,
+            r=config.rank,
+            lora_alpha=config.alpha,
             lora_dropout=0.0,  # No dropout as discussed
             target_modules=target_modules,
             bias="none",

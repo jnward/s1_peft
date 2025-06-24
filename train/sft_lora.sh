@@ -13,8 +13,8 @@ gpu_count=$(nvidia-smi -L | wc -l)
 push_to_hub=false
 
 # LoRA specific parameters
-lora_rank=16  # Default rank, can be overridden via command line
-lora_alpha=16  # Fixed alpha as discussed
+rank=16  # Default rank, can be overridden via command line
+alpha=32  # Alpha = 2*rank (for default rank=16)
 
 torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     train/sft_lora.py \
@@ -38,9 +38,9 @@ torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     --adam_beta1=0.9 \
     --adam_beta2=0.95 \
     --use_lora=True \
-    --lora_rank=${lora_rank} \
-    --lora_alpha=${lora_alpha} \
-    --output_dir="ckpts/s1-lora-r${lora_rank}-${uid}" \
+    --rank=${rank} \
+    --alpha=${alpha} \
+    --output_dir="ckpts/s1-lora-r${rank}-${uid}" \
     --push_to_hub=${push_to_hub} \
     --save_only_model=True
     # --gradient_checkpointing=True \ # Likely not needed with LoRA due to reduced memory usage
