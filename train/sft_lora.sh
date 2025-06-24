@@ -1,29 +1,50 @@
 # Reference Running: bash train/sft_lora.sh
 # LoRA training script for s1 project
 uid="$(date +%Y%m%d_%H%M%S)"
-base_model="Qwen/Qwen2.5-32B-Instruct"
-lr=3e-4  # Higher learning rate for LoRA
+base_model="Qwen/Qwen2.5-7B-Instruct"
+block_size=10000
+lr=5e-4
 min_lr=0
 epochs=5
 weight_decay=1e-4
+batch_size=16
 micro_batch_size=1
-gradient_accumulation_steps=1
 max_steps=-1
 gpu_count=$(nvidia-smi -L | wc -l)
+gradient_accumulation_steps=$((batch_size / (micro_batch_size * gpu_count)))
 push_to_hub=false
 
 # LoRA specific parameters
 rank=16  # Default rank, can be overridden via command line
 alpha=32  # Alpha = 2*rank (for default rank=16)
 
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --rank)
+            rank="$2"
+            alpha=$((rank * 2))
+            shift 2
+            ;;
+        --lr|--learning_rate)
+            lr="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
 torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     train/sft_lora.py \
-    --block_size=32768 \
+    --block_size=${block_size} \
     --per_device_train_batch_size=${micro_batch_size} \
     --per_device_eval_batch_size=${micro_batch_size} \
     --gradient_accumulation_steps=${gradient_accumulation_steps} \
     --num_train_epochs=${epochs} \
-    --train_file_path="simplescaling/s1K_tokenized" \
+    --train_file_path="simplescaling/s1K-1.1_tokenized" \
     --model_name=${base_model} \
     --warmup_ratio=0.05 \
     --fsdp="full_shard auto_wrap" \
@@ -42,5 +63,5 @@ torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     --alpha=${alpha} \
     --output_dir="ckpts/s1-lora-r${rank}-${uid}" \
     --push_to_hub=${push_to_hub} \
-    --save_only_model=True
-    # --gradient_checkpointing=True \ # Likely not needed with LoRA due to reduced memory usage
+    --save_only_model=True 
+    # --gradient_checkpointing=True
