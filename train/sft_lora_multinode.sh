@@ -1,5 +1,10 @@
-# Reference Running: bash train/sft_lora.sh
-# LoRA training script for s1 project
+#!/bin/bash
+# Multi-node LoRA training script for s1 project
+# This script expects environment variables set by your cluster scheduler:
+# - NUM_NODES: total number of nodes
+# - REPLICA_RANK: rank of this node (0 for master, 1+ for workers)
+# - REPLICA_HOSTNAME: hostname/IP of the master node
+
 uid="$(date +%Y%m%d_%H%M%S)"
 base_model="Qwen/Qwen2.5-7B-Instruct"
 block_size=20000
@@ -7,16 +12,15 @@ lr=5e-4
 min_lr=0
 epochs=5
 weight_decay=1e-4
-batch_size=16
-micro_batch_size=1
+micro_batch_size=1  # If 2 nodes with 8 gpus each, batch_size will be 16
+gradient_accumulation_steps=1
 max_steps=-1
 gpu_count=$(nvidia-smi -L | wc -l)
-gradient_accumulation_steps=$((batch_size / (micro_batch_size * gpu_count)))
 push_to_hub=false
 
 # LoRA specific parameters
-rank=16  # Default rank, can be overridden via command line
-alpha=16
+rank=16
+alpha=16  # Fixed alpha for RSLoRA
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -37,7 +41,17 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
+echo "Running on node ${REPLICA_RANK} of ${NUM_NODES} with ${gpu_count} GPUs"
+echo "Master node: ${REPLICA_HOSTNAME}:29401"
+
+torchrun \
+    --nnodes ${NUM_NODES}:${NUM_NODES} \
+    --node_rank=$REPLICA_RANK \
+    --nproc-per-node ${gpu_count} \
+    --rdzv_id=12347 \
+    --rdzv_backend=c10d \
+    --rdzv_conf='read_timeout=420' \
+    --rdzv_endpoint=$REPLICA_HOSTNAME:29401 \
     train/sft_lora.py \
     --block_size=${block_size} \
     --per_device_train_batch_size=${micro_batch_size} \

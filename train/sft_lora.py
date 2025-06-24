@@ -45,6 +45,13 @@ def train():
     else:
         model = transformers.AutoModelForCausalLM.from_pretrained(config.model_name)
 
+    # Enable gradient checkpointing if requested (must be done BEFORE LoRA)
+    if args.gradient_checkpointing:
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+        # Required for gradient checkpointing to work with PEFT
+        model.enable_input_require_grads()
+        logging.info("Enabled gradient checkpointing with use_reentrant=False for PEFT compatibility")
+
     # Apply LoRA if enabled
     if config.use_lora:
         # Auto-detect target modules based on model architecture
@@ -64,6 +71,7 @@ def train():
             lora_dropout=0.0,  # No dropout as discussed
             target_modules=target_modules,
             bias="none",
+            use_rslora=True,  # Use rank-stabilized LoRA scaling
         )
         
         model = get_peft_model(model, peft_config)
