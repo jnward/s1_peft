@@ -14,12 +14,12 @@ push_to_hub=false
 
 torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     train/sft.py \
-    --block_size=32768 \
+    --block_size=20000 \
     --per_device_train_batch_size=${micro_batch_size} \
     --per_device_eval_batch_size=${micro_batch_size} \
     --gradient_accumulation_steps=${gradient_accumulation_steps} \
     --num_train_epochs=${epochs} \
-    --train_file_path="simplescaling/s1K_tokenized" \
+    --train_file_path="simplescaling/s1K-1.1_tokenized" \
     --model_name=${base_model} \
     --warmup_ratio=0.05 \
     --fsdp="full_shard auto_wrap" \
