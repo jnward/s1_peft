@@ -2,6 +2,12 @@
 # Evaluation script for LoRA models with vLLM
 # Usage: bash eval_lora.sh ckpts/s1-lora-r16-20250624
 
+# Fix for H200 NCCL CUDA error 999 - disable NVLS (NVLink SHARP)
+export NCCL_NVLS_ENABLE=0
+export NCCL_ALGO=Ring
+export NCCL_DEBUG=WARN
+export CUDA_LAUNCH_BLOCKING=0
+
 ADAPTER_PATH=$1
 if [ -z "$ADAPTER_PATH" ]; then
     echo "Usage: bash eval_lora.sh <adapter_path>"
@@ -53,8 +59,8 @@ fi
 
 PROCESSOR=gpt-4o-mini lm_eval \
     --model vllm \
-    --model_args "pretrained=${PWD}/../../${MERGED_PATH},dtype=bfloat16,tensor_parallel_size=4" \
-    --tasks aime24_nofigures,openai_math,gpqa_diamond_openai \
+    --model_args "pretrained=${PWD}/../../${MERGED_PATH},dtype=bfloat16,tensor_parallel_size=8" \
+    --tasks aime24_nofigures,openai_math \
     --batch_size auto \
     --apply_chat_template \
     --output_path "../../results/lora_${MODEL_SIZE}_r${RANK}" \

@@ -1,7 +1,7 @@
 # Reference Running: bash train/sft_lora.sh
 # LoRA training script for s1 project
 uid="$(date +%Y%m%d_%H%M%S)"
-model_size="7B"  # Default model size, can be overridden via --model_size
+model_size="32B"  # Default model size, can be overridden via --model_size
 base_model="Qwen/Qwen2.5-${model_size}-Instruct"
 block_size=20000
 lr=5e-4
@@ -16,7 +16,7 @@ gradient_accumulation_steps=$((batch_size / (micro_batch_size * gpu_count)))
 push_to_hub=false
 
 # LoRA specific parameters
-rank=16  # Default rank, can be overridden via command line
+rank=128  # Default rank, can be overridden via command line
 alpha=16
 
 # Parse command line arguments
@@ -50,7 +50,7 @@ torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     --per_device_eval_batch_size=${micro_batch_size} \
     --gradient_accumulation_steps=${gradient_accumulation_steps} \
     --num_train_epochs=${epochs} \
-    --train_file_path="simplescaling/s1K-1.1_tokenized" \
+    --train_file_path="simplescaling/s1K_tokenized" \
     --model_name=${base_model} \
     --warmup_ratio=0.05 \
     --fsdp="full_shard auto_wrap" \

@@ -2,6 +2,12 @@
 # Parallel evaluation script for running benchmarks on split GPUs
 # Usage: bash eval_parallel.sh /path/to/model
 
+# Fix for H200 NCCL CUDA error 999 - disable NVLS (NVLink SHARP)
+export NCCL_NVLS_ENABLE=0
+export NCCL_ALGO=Ring
+export NCCL_DEBUG=WARN
+export CUDA_LAUNCH_BLOCKING=0
+
 MODEL_PATH=$1
 if [ -z "$MODEL_PATH" ]; then
     echo "Usage: bash eval_parallel.sh /path/to/model"
