@@ -72,4 +72,4 @@ cd ../..
 echo "Evaluation complete! Results saved to: results/lora_${MODEL_SIZE}_r${RANK}"
 
 # Optional: Clean up merged model to save space
-# rm -rf $MERGED_PATH
+rm -rf $MERGED_PATH

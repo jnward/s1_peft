@@ -8,5 +8,5 @@ export CUDA_LAUNCH_BLOCKING=0
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 # Run the training script
-# bash train/sft_lora.sh "$@"
-bash train/sft.sh "$@"./
+bash train/sft_lora.sh "$@"
+# bash train/sft.sh "$@"./

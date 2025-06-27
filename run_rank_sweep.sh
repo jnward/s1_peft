@@ -8,7 +8,7 @@ echo "Testing ranks: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512"
 echo "================================================"
 
 # Array of ranks to test
-ranks=(1 4 16 64 256)
+ranks=(1 4 64)
 
 # Loop through each rank
 for rank in "${ranks[@]}"; do

@@ -50,7 +50,7 @@ torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     --per_device_eval_batch_size=${micro_batch_size} \
     --gradient_accumulation_steps=${gradient_accumulation_steps} \
     --num_train_epochs=${epochs} \
-    --train_file_path="simplescaling/s1K_tokenized" \
+    --train_file_path="simplescaling/s1K-1.1_tokenized" \
     --model_name=${base_model} \
     --warmup_ratio=0.05 \
     --fsdp="full_shard auto_wrap" \
@@ -67,7 +67,7 @@ torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     --use_lora=True \
     --rank=${rank} \
     --alpha=${alpha} \
-    --output_dir="ckpts/s1-lora-${model_size}-r${rank}-${uid}" \
+    --output_dir="ckpts_1.1/s1-lora-${model_size}-r${rank}-${uid}" \
     --push_to_hub=${push_to_hub} \
     --save_only_model=True \
     --gradient_checkpointing=True
