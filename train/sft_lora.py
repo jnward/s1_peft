@@ -22,6 +22,8 @@ class TrainingConfig:
     use_lora: bool = field(default=True)
     rank: int = field(default=16)
     alpha: int = field(default=32)  # Default alpha = 2*default_rank
+    layer_start: Optional[int] = field(default=None)  # Starting layer index (0-based)
+    layer_end: Optional[int] = field(default=None)    # Ending layer index (exclusive)
 
     def __post_init__(self):
         os.environ['WANDB_PROJECT'] = self.wandb_project
@@ -54,15 +56,42 @@ def train():
 
     # Apply LoRA if enabled
     if config.use_lora:
-        # Auto-detect target modules based on model architecture
-        if "Qwen" in config.model_name:
-            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-        elif "Llama" in config.model_name:
-            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-        else:
-            # Fallback to common patterns
-            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]
-            logging.warning(f"Using default target modules for {config.model_name}. May need adjustment.")
+        # Only target MLP projection layers
+        target_modules = ["gate_proj", "up_proj", "down_proj"]
+        
+        # Determine layer range
+        if config.layer_start is not None or config.layer_end is not None:
+            # Get total number of layers
+            if hasattr(model.config, 'num_hidden_layers'):
+                total_layers = model.config.num_hidden_layers
+            else:
+                # Fallback for different model architectures
+                total_layers = len([n for n, _ in model.named_modules() if '.mlp.gate_proj' in n])
+            
+            # Set defaults if not specified
+            layer_start = config.layer_start if config.layer_start is not None else 0
+            layer_end = config.layer_end if config.layer_end is not None else total_layers
+            
+            # Validate range
+            if layer_start < 0 or layer_end > total_layers or layer_start >= layer_end:
+                raise ValueError(f"Invalid layer range: {layer_start}-{layer_end} for model with {total_layers} layers")
+            
+            # Build specific layer patterns
+            layer_specific_modules = []
+            for layer_idx in range(layer_start, layer_end):
+                for module in target_modules:
+                    # Pattern varies by model architecture
+                    if "Qwen" in config.model_name:
+                        layer_specific_modules.append(f"model.layers.{layer_idx}.mlp.{module}")
+                    elif "Llama" in config.model_name:
+                        layer_specific_modules.append(f"model.layers.{layer_idx}.mlp.{module}")
+                    else:
+                        # Generic pattern
+                        layer_specific_modules.append(f"layers.{layer_idx}.mlp.{module}")
+            
+            target_modules = layer_specific_modules
+            logging.info(f"Targeting layers {layer_start}-{layer_end} out of {total_layers} total layers")
+            logging.info(f"Total modules to be adapted: {len(target_modules)}")
         
         peft_config = LoraConfig(
             task_type=TaskType.CAUSAL_LM,
@@ -83,6 +112,24 @@ def train():
             logging.info(f"Adjusted learning rate to {args.learning_rate} for LoRA training")
 
     dataset = load_dataset(config.train_file_path)
+    
+    # Configure wandb run name
+    if args.report_to and "wandb" in args.report_to:
+        import wandb
+        # Build run name with mlp_only and layer range
+        run_name_parts = [f"s1-lora-r{config.rank}-mlp_only"]
+        if config.layer_start is not None or config.layer_end is not None:
+            layer_start = config.layer_start if config.layer_start is not None else 0
+            layer_end = config.layer_end if config.layer_end is not None else "all"
+            run_name_parts.append(f"l{layer_start}-{layer_end}")
+        
+        # Add timestamp
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_name_parts.append(timestamp)
+        
+        args.run_name = "-".join(run_name_parts)
+        logging.info(f"Wandb run name: {args.run_name}")
 
     # setting up trainer
     tokenizer = transformers.AutoTokenizer.from_pretrained(config.model_name, use_fast=True)
