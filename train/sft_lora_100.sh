@@ -1,12 +1,20 @@
-# Reference Running: bash train/sft_lora.sh
-# LoRA training script for s1 project
+#!/bin/bash
+# Reference Running: bash train/sft_lora_100.sh
+# LoRA training script for s1 project with 100 samples
+
+# Fix for H200 NCCL CUDA error 999 - disable NVLS (NVLink SHARP)
+export NCCL_NVLS_ENABLE=0
+export NCCL_ALGO=Ring
+export NCCL_DEBUG=WARN
+export CUDA_LAUNCH_BLOCKING=0
+
 uid="$(date +%Y%m%d_%H%M%S)"
 model_size="32B"  # Default model size, can be overridden via --model_size
 base_model="Qwen/Qwen2.5-${model_size}-Instruct"
 block_size=20000
 lr=1e-3
 min_lr=0
-epochs=5
+epochs=100
 weight_decay=1e-4
 batch_size=16
 micro_batch_size=1
@@ -22,6 +30,7 @@ layer_start=""  # Default: train all layers
 layer_end=""    # Default: train all layers
 layer_indices=""  # Specific layers to train (comma-separated)
 layer_stride=""   # Train every nth layer
+num_samples=10  # Number of training samples (default: 100)
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -62,6 +71,14 @@ while [[ $# -gt 0 ]]; do
             layer_stride="$2"
             shift 2
             ;;
+        --epochs)
+            epochs="$2"
+            shift 2
+            ;;
+        --num_samples)
+            num_samples="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown option: $1"
             exit 1
@@ -95,7 +112,7 @@ fi
 
 # Build command with optional layer range parameters
 cmd="torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
-    train/sft_lora.py \
+    train/sft_lora_100.py \
     --block_size=${block_size} \
     --per_device_train_batch_size=${micro_batch_size} \
     --per_device_eval_batch_size=${micro_batch_size} \
@@ -117,7 +134,8 @@ cmd="torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     --adam_beta2=0.95 \
     --use_lora=True \
     --rank=${rank} \
-    --alpha=${alpha}"
+    --alpha=${alpha} \
+    --num_train_samples=${num_samples}"
 
 # Add layer range parameters if specified
 if [ -n "$layer_start" ]; then
@@ -133,8 +151,9 @@ if [ -n "$layer_stride" ]; then
     cmd="$cmd --layer_stride=${layer_stride}"
 fi
 
+# Note the samples suffix in the output directory
 cmd="$cmd \
-    --output_dir=\"ckpts_1.1/s1-lora-${model_size}-r${rank}-mlp_only${layer_suffix}-${uid}\" \
+    --output_dir=\"ckpts_1.1/s1-lora-${model_size}-r${rank}-mlp_only-${num_samples}samples${layer_suffix}-${uid}\" \
     --push_to_hub=${push_to_hub} \
     --save_only_model=True \
     --gradient_checkpointing=True"

@@ -26,6 +26,7 @@ class TrainingConfig:
     layer_end: Optional[int] = field(default=None)    # Ending layer index (exclusive)
     layer_indices: Optional[str] = field(default=None)  # Comma-separated list of specific layers
     layer_stride: Optional[int] = field(default=None)   # Train every nth layer
+    num_train_samples: int = field(default=100)  # Number of training samples to use
 
     def __post_init__(self):
         os.environ['WANDB_PROJECT'] = self.wandb_project
@@ -132,13 +133,22 @@ def train():
             args.learning_rate = 3e-4
             logging.info(f"Adjusted learning rate to {args.learning_rate} for LoRA training")
 
+    # Load dataset and take random samples
     dataset = load_dataset(config.train_file_path)
     
-    # Configure wandb run name
+    # Take random samples from training set with fixed seed for reproducibility
+    num_samples = config.num_train_samples
+    random_seed = 42  # Fixed seed ensures same samples across runs
+    
+    # Shuffle with seed and take requested number of samples
+    train_dataset = dataset['train'].shuffle(seed=random_seed).select(range(min(num_samples, len(dataset['train']))))
+    logging.info(f"Using {len(train_dataset)} random training samples (seed={random_seed})")
+    
+    # Configure wandb run name with sample count
     if args.report_to and "wandb" in args.report_to:
         import wandb
         # Build run name with mlp_only and layer range
-        run_name_parts = [f"s1-lora-r{config.rank}-mlp_only"]
+        run_name_parts = [f"s1-lora-r{config.rank}-mlp_only-{config.num_train_samples}samples"]
         
         # Add layer specification to run name
         if config.layer_indices is not None:
@@ -191,8 +201,8 @@ def train():
     args.max_seq_length = config.block_size
     trainer = trl.SFTTrainer(
         model,
-        train_dataset=dataset['train'],
-        eval_dataset=dataset['test'] if 'test' in dataset else dataset['train'],
+        train_dataset=train_dataset,  # Use limited dataset
+        eval_dataset=dataset['test'] if 'test' in dataset else train_dataset,
         args=args,
         data_collator=collator
     )
