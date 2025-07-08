@@ -18,7 +18,7 @@ epochs=1000
 weight_decay=1e-4
 batch_size=1  # Single example, so batch size is 1
 micro_batch_size=1
-eval_batch_size=4  # Larger batch size for faster evaluation
+eval_batch_size=2  # Larger batch size for faster evaluation
 max_steps=-1
 gpu_count=$(nvidia-smi -L | wc -l)
 gradient_accumulation_steps=$((batch_size / (micro_batch_size * gpu_count)))
@@ -141,7 +141,7 @@ cmd="torchrun --nproc-per-node ${gpu_count} --master_port 12345 \
     --per_device_eval_batch_size=${eval_batch_size} \
     --gradient_accumulation_steps=${gradient_accumulation_steps} \
     --num_train_epochs=${epochs} \
-    --train_file_path=\"simplescaling/s1K_tokenized\" \
+    --train_file_path=\"simplescaling/s1K-1.1_tokenized\" \
     --model_name=${base_model} \
     --warmup_ratio=0.05 \
     --fsdp=\"full_shard auto_wrap\" \
@@ -183,10 +183,7 @@ cmd="$cmd \
     --output_dir=\"ckpts_1.1/s1-lora-${model_size}-r${rank}-single_idx${train_example_idx}-eval${num_eval_examples}${layer_suffix}-${uid}\" \
     --push_to_hub=${push_to_hub} \
     --save_only_model=True \
-    --gradient_checkpointing=True \
-    --load_best_model_at_end=True \
-    --metric_for_best_model=\"eval_loss\" \
-    --greater_is_better=False"
+    --gradient_checkpointing=True"
 
 echo "Training on single example at index ${train_example_idx}"
 echo "Evaluating on ${num_eval_examples} random examples (excluding training example)"
